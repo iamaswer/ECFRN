@@ -1,0 +1,46 @@
+import os
+import sys
+import torch
+import yaml
+import numpy as np
+from functools import partial
+sys.path.append('../../../../')
+from trainers import trainer, ecfrn_train
+from datasets import dataloaders
+from models.backbones.ASCO import ASCO, Train_ASCO
+from models.Weight_ECFRN  import Weight_ECFRN
+from utils import util
+
+with open('../../../../config.yml', 'r') as f:
+    temp = yaml.safe_load(f)
+path = os.path.abspath(temp['data_path'])
+
+data_path = os.path.join(path,'CUB_fewshot_cropped/train')
+save_path  = 'model_asco.pth'
+# Pre-trained model stub
+model_path_1 = './model1_Conv-4.pth'
+
+gpu = 0
+torch.cuda.set_device(gpu)
+
+model1 = Weight_ECFRN(resnet=False)
+model1.cuda()
+model1.load_state_dict(torch.load(model_path_1,map_location=util.get_device_map(gpu)),strict=True)
+model1.eval()
+
+model = ASCO()
+train_model=Train_ASCO(pretrained_model=model1,
+             model = model,
+             data_path=data_path,
+             save_path=save_path,
+             )
+
+# Prepare experimental dataset with sample C and K values
+C_values = np.arange(2, 5)  
+K_values = np.arange(1, 5)  
+train_model.prepare_experimental_dataset(C_values, K_values, pre=False, transform_type=0)
+print(train_model.Dexp)
+# Train the linear model
+train_model.train()
+
+
